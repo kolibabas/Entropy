@@ -121,6 +121,7 @@ namespace EntropyServer
         private int asteroids_cap;
 
         private List<Notification> Unread_Notifications; //TODO Get notifications from database
+        public bool fleet_at_home;
 
 #endregion
 
@@ -181,7 +182,14 @@ namespace EntropyServer
                 this.tech_base_fleet_cap = (int)query.result.Tables[0].Rows[0]["tech_base_fleet_cap"];
                 this.tech_base_asteroid_cap = (int)query.result.Tables[0].Rows[0]["tech_base_asteroid_cap"];
 
-
+                if (this.action_attack.Type == PLAYER_ACTION.ACTION_NO_ACTION)
+                {
+                    fleet_at_home = true;
+                }
+                else
+                {
+                    fleet_at_home = false;
+                }
             }
             else
             {
@@ -404,7 +412,7 @@ namespace EntropyServer
             //Attack Slot
             if (TimeManager.Tick == action_attack.End_Tick)
             {
-                //TODO Do Combat!
+                Do_Combat(action_attack);
             }
 
             //Ship Slot
@@ -516,6 +524,188 @@ namespace EntropyServer
             {
                 credits_current += Score_Overall / DIRECT_DIVISOR;
             }
+        }
+
+        private void Do_Combat(PlayerAction action)
+        {
+
+            //Get target player
+            Player target_player = PlayerManager.Players[action.Target_Player_Name];
+
+            //Compute total attacking power
+            int attacker_power = 0;
+            foreach (KeyValuePair<SHIP_TYPE, int> pair in this.Ships_Attacking)
+            {
+                attacker_power += GameManager.Ship_Templates[pair.Key].Combat_Rating * pair.Value * TechManager.Tech_Mod(TECH_TYPE.TECH_SHIP_WEAPONS, this.tech_ship_weapons);
+            }
+
+            //Compute Defender combat power
+            //Add raw power from ships defending
+            int defender_power = 0;
+            foreach (KeyValuePair<SHIP_TYPE, int> pair in target_player.Ships_Defending)
+            {
+                defender_power += GameManager.Ship_Templates[pair.Key].Combat_Rating * pair.Value * TechManager.Tech_Mod(TECH_TYPE.TECH_SHIP_WEAPONS, target_player.tech_ship_weapons);
+            }
+
+            //If the defending fleet is at home, it adds its raw combat power to the defense
+            if (target_player.fleet_at_home)
+            {
+                foreach (KeyValuePair<SHIP_TYPE, int> pair in target_player.Ships_Attacking)
+                {
+                    defender_power += GameManager.Ship_Templates[pair.Key].Combat_Rating * pair.Value * TechManager.Tech_Mod(TECH_TYPE.TECH_SHIP_WEAPONS, target_player.tech_ship_weapons);
+                }
+            }
+
+            //Add powers from all structures with combat power
+            foreach (KeyValuePair<STRUCTURE_TYPE, int> pair in target_player.Structures)
+            {
+                defender_power += GameManager.Structure_Templates[pair.Key].Bonus_Combat * pair.Value * TechManager.Tech_Mod(TECH_TYPE.TECH_STRUCT_WEAPONS, target_player.tech_struct_weapons);
+            }
+
+            //Determine which attacking and defending specialty ships (Covert Ops, et al) to add to the scores
+            //Using the same mechanism as above based on attack type
+            switch (action.Type)
+            {
+                case PLAYER_ACTION.ACTION_ATTACK_COMBAT:
+                    break;
+                case PLAYER_ACTION.ACTION_ATTACK_DIPLOMACY:
+                    foreach (KeyValuePair<SHIP_TYPE, int> pair in this.Ships_Attacking)
+                    {
+                        attacker_power += GameManager.Ship_Templates[pair.Key].Bonus_Diplomacy * pair.Value;
+                    }
+
+                    foreach (KeyValuePair<SHIP_TYPE, int> pair in target_player.Ships_Defending)
+                    {
+                        defender_power += GameManager.Ship_Templates[pair.Key].Bonus_Diplomacy * pair.Value;
+                    }
+
+                    if (target_player.fleet_at_home)
+                    {
+                        foreach (KeyValuePair<SHIP_TYPE, int> pair in target_player.Ships_Attacking)
+                        {
+                            defender_power += GameManager.Ship_Templates[pair.Key].Bonus_Diplomacy * pair.Value;
+                        }
+                    }
+                    break;
+                case PLAYER_ACTION.ACTION_ATTACK_ECON:
+                    foreach (KeyValuePair<SHIP_TYPE, int> pair in this.Ships_Attacking)
+                    {
+                        attacker_power += GameManager.Ship_Templates[pair.Key].Bonus_Econ * pair.Value;
+                    }
+
+                    foreach (KeyValuePair<SHIP_TYPE, int> pair in target_player.Ships_Defending)
+                    {
+                        defender_power += GameManager.Ship_Templates[pair.Key].Bonus_Econ * pair.Value;
+                    }
+
+                    if (target_player.fleet_at_home)
+                    {
+                        foreach (KeyValuePair<SHIP_TYPE, int> pair in target_player.Ships_Attacking)
+                        {
+                            defender_power += GameManager.Ship_Templates[pair.Key].Bonus_Econ * pair.Value;
+                        }
+                    }
+                    break;
+                case PLAYER_ACTION.ACTION_ATTACK_TECH:
+                    foreach (KeyValuePair<SHIP_TYPE, int> pair in this.Ships_Attacking)
+                    {
+                        attacker_power += GameManager.Ship_Templates[pair.Key].Bonus_Tech * pair.Value;
+                    }
+
+                    foreach (KeyValuePair<SHIP_TYPE, int> pair in target_player.Ships_Defending)
+                    {
+                        defender_power += GameManager.Ship_Templates[pair.Key].Bonus_Tech * pair.Value;
+                    }
+
+                    if (target_player.fleet_at_home)
+                    {
+                        foreach (KeyValuePair<SHIP_TYPE, int> pair in target_player.Ships_Attacking)
+                        {
+                            defender_power += GameManager.Ship_Templates[pair.Key].Bonus_Tech * pair.Value;
+                        }
+                    }
+                    break;
+                default:
+                    break;
+            }
+
+            //Compute power difference and victor
+            float differential = attacker_power - defender_power;
+            bool attacker_victory = differential > 0 ? true : false; //TODO GAVIN'S TERNARY STATEMENT
+
+            //Attacker can only lose HP from ships that attacked
+            //If they won, limit losses to 20% of differential
+            int attacker_hp_loss = 0;
+            int total_attack_hp = 0;
+            foreach (KeyValuePair<SHIP_TYPE, int> pair in this.Ships_Attacking)
+            {
+                total_attack_hp += GameManager.Ship_Templates[pair.Key].HP * pair.Value * TechManager.Tech_Mod(TECH_TYPE.TECH_SHIP_HP, target_player.tech_ship_hp); ;
+            }
+            float attacker_loss_mod = attacker_victory ? 0.2f : 0.8f;
+            attacker_hp_loss = (int)((differential / (float)attacker_power) * total_attack_hp * attacker_loss_mod);
+
+            //Defender can lose any ship present and any structure that was targeted
+            int defender_hp_loss = 0;
+            int total_defend_hp = 0;
+            foreach (KeyValuePair<SHIP_TYPE, int> pair in this.Ships_Defending)
+            {
+                total_defend_hp += GameManager.Ship_Templates[pair.Key].HP * pair.Value;
+            }
+
+            if (target_player.fleet_at_home)
+            {
+                foreach (KeyValuePair<SHIP_TYPE, int> pair in target_player.Ships_Attacking)
+                {
+                    total_defend_hp += GameManager.Ship_Templates[pair.Key].Bonus_Tech * pair.Value;
+                }
+            }
+
+            //Add only structures that have a stat that was targeted by the attack action. ACTION_ATTACK_COMBAT targets all.
+            foreach (KeyValuePair<STRUCTURE_TYPE, int> pair in target_player.Structures)
+            {
+                bool add = false;
+                if (action.Type == PLAYER_ACTION.ACTION_ATTACK_COMBAT)
+                {
+                    add = true;
+                }
+                else if (action.Type == PLAYER_ACTION.ACTION_ATTACK_DIPLOMACY && GameManager.Structure_Templates[pair.Key].Bonus_Diplomacy > 0)
+                {
+                    add = true;
+                }
+                else if (action.Type == PLAYER_ACTION.ACTION_ATTACK_ECON && GameManager.Structure_Templates[pair.Key].Bonus_Econ > 0)
+                {
+                    add = true;
+                }
+                else if (action.Type == PLAYER_ACTION.ACTION_ATTACK_TECH && GameManager.Structure_Templates[pair.Key].Bonus_Tech > 0)
+                {
+                    add = true;
+                }
+
+                if (add)
+                {
+                    total_defend_hp += GameManager.Structure_Templates[pair.Key].HP * pair.Value * TechManager.Tech_Mod(TECH_TYPE.TECH_STRUCT_HP, target_player.tech_struct_hp);
+                }
+            }
+
+            //If defender won, limit losses to 20%
+            float defender_loss_mod = attacker_victory ? 0.8f : 0.2f;
+            defender_hp_loss = (int)((differential / (float)attacker_power) * total_defend_hp * defender_loss_mod);
+
+            //Select destroyed ships and structures
+            Random rand = new Random();
+            while (attacker_hp_loss > 0)
+            {
+                SHIP_TYPE destroyed_ship = (SHIP_TYPE)rand.Next((int)SHIP_TYPE.SHIP_LAST_SHIP);
+
+                //If there is an attacking ship of this type, destroy it, reduce HP loss by its HP
+                if (this.Ships_Attacking[destroyed_ship] > 0)
+                {
+                    this.Ships_Attacking[destroyed_ship]--;
+                    attacker_hp_loss -= GameManager.Ship_Templates[destroyed_ship].HP * TechManager.Tech_Mod(TECH_TYPE.TECH_SHIP_HP, this.tech_ship_hp);
+                }
+            }
+
+            //TODO Defender losses, decide between ships and structures
         }
 
         #endregion
