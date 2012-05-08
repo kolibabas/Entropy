@@ -67,6 +67,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Asteroid.cs" />
+    <Compile Include="Query.cs" />
     <Compile Include="Connection.cs" />
     <Compile Include="ConnectionManager.cs" />
     <Compile Include="GameManager.cs" />

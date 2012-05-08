@@ -148,40 +148,38 @@ namespace EntropyServer
 
         private void Load_Database_Values()
         {
-            SqlCeDataAdapter adapter = new SqlCeDataAdapter("select * from Player where user_name=\'" + this.user_name + "\'", ConnectionManager.SQLConnection);
-            DataSet ds = new DataSet();
-            adapter.Fill(ds);
+            Query query = new Query("select * from Player where user_name=\'" + this.user_name + "\'");
 
-            if (ds.Tables[0].Rows.Count != 0)
+            if (query.result.Tables[0].Rows.Count != 0)
             {
-                this.ID = (int)ds.Tables[0].Rows[0]["id"];
-                this.strategy = (PLAYER_STRAT)(int)ds.Tables[0].Rows[0]["strategy"];
-                this.credits_current = (int)ds.Tables[0].Rows[0]["credits_current"];
-                this.Asteroids = Parse_Asteroids(ds.Tables[0].Rows[0]["asteroids"].ToString());
-                this.Structures = Parse_Structures(ds.Tables[0].Rows[0]["structures"].ToString());
-                this.Ships_Attacking = Parse_Ships(ds.Tables[0].Rows[0]["ships_attacking"].ToString());
-                this.Ships_Defending = Parse_Ships(ds.Tables[0].Rows[0]["ships_defending"].ToString());
+                this.ID = (int)query.result.Tables[0].Rows[0]["id"];
+                this.strategy = (PLAYER_STRAT)(int)query.result.Tables[0].Rows[0]["strategy"];
+                this.credits_current = (int)query.result.Tables[0].Rows[0]["credits_current"];
+                this.Asteroids = Parse_Asteroids(query.result.Tables[0].Rows[0]["asteroids"].ToString());
+                this.Structures = Parse_Structures(query.result.Tables[0].Rows[0]["structures"].ToString());
+                this.Ships_Attacking = Parse_Ships(query.result.Tables[0].Rows[0]["ships_attacking"].ToString());
+                this.Ships_Defending = Parse_Ships(query.result.Tables[0].Rows[0]["ships_defending"].ToString());
 
-                this.action_attack = Parse_Action(ds.Tables[0].Rows[0]["action_attack"].ToString());
-                this.action_build_ship = Parse_Action(ds.Tables[0].Rows[0]["action_build_ship"].ToString());
-                this.action_build_struct = Parse_Action(ds.Tables[0].Rows[0]["action_build_struct"].ToString());
-                this.action_research = Parse_Action(ds.Tables[0].Rows[0]["action_research"].ToString());
-                this.action_diplomacy = Parse_Action(ds.Tables[0].Rows[0]["action_diplomacy"].ToString());
-                this.action_direct = Parse_Action(ds.Tables[0].Rows[0]["action_direct"].ToString());
+                this.action_attack = Parse_Action(query.result.Tables[0].Rows[0]["action_attack"].ToString());
+                this.action_build_ship = Parse_Action(query.result.Tables[0].Rows[0]["action_build_ship"].ToString());
+                this.action_build_struct = Parse_Action(query.result.Tables[0].Rows[0]["action_build_struct"].ToString());
+                this.action_research = Parse_Action(query.result.Tables[0].Rows[0]["action_research"].ToString());
+                this.action_diplomacy = Parse_Action(query.result.Tables[0].Rows[0]["action_diplomacy"].ToString());
+                this.action_direct = Parse_Action(query.result.Tables[0].Rows[0]["action_direct"].ToString());
 
-                this.tech_ship_weapons = (int)ds.Tables[0].Rows[0]["tech_ship_weapons"];
-                this.tech_ship_hp = (int)ds.Tables[0].Rows[0]["tech_ship_hp"];
-                this.tech_ship_engine = (int)ds.Tables[0].Rows[0]["tech_ship_engine"];
-                this.tech_ship_stealth = (int)ds.Tables[0].Rows[0]["tech_ship_stealth"];
-                this.tech_struct_weapons = (int)ds.Tables[0].Rows[0]["tech_struct_weapons"];
-                this.tech_struct_hp = (int)ds.Tables[0].Rows[0]["tech_struct_hp"];
-                this.tech_struct_econ = (int)ds.Tables[0].Rows[0]["tech_struct_mining"];
-                this.tech_struct_research = (int)ds.Tables[0].Rows[0]["tech_struct_research"];
-                this.tech_struct_diplomacy = (int)ds.Tables[0].Rows[0]["tech_struct_diplomacy"];
-                this.tech_construct_speed = (int)ds.Tables[0].Rows[0]["tech_construct_speed"];
-                this.tech_base_sensors = (int)ds.Tables[0].Rows[0]["tech_base_sensors"];
-                this.tech_base_fleet_cap = (int)ds.Tables[0].Rows[0]["tech_base_fleet_cap"];
-                this.tech_base_asteroid_cap = (int)ds.Tables[0].Rows[0]["tech_base_asteroid_cap"];
+                this.tech_ship_weapons = (int)query.result.Tables[0].Rows[0]["tech_ship_weapons"];
+                this.tech_ship_hp = (int)query.result.Tables[0].Rows[0]["tech_ship_hp"];
+                this.tech_ship_engine = (int)query.result.Tables[0].Rows[0]["tech_ship_engine"];
+                this.tech_ship_stealth = (int)query.result.Tables[0].Rows[0]["tech_ship_stealth"];
+                this.tech_struct_weapons = (int)query.result.Tables[0].Rows[0]["tech_struct_weapons"];
+                this.tech_struct_hp = (int)query.result.Tables[0].Rows[0]["tech_struct_hp"];
+                this.tech_struct_econ = (int)query.result.Tables[0].Rows[0]["tech_struct_mining"];
+                this.tech_struct_research = (int)query.result.Tables[0].Rows[0]["tech_struct_research"];
+                this.tech_struct_diplomacy = (int)query.result.Tables[0].Rows[0]["tech_struct_diplomacy"];
+                this.tech_construct_speed = (int)query.result.Tables[0].Rows[0]["tech_construct_speed"];
+                this.tech_base_sensors = (int)query.result.Tables[0].Rows[0]["tech_base_sensors"];
+                this.tech_base_fleet_cap = (int)query.result.Tables[0].Rows[0]["tech_base_fleet_cap"];
+                this.tech_base_asteroid_cap = (int)query.result.Tables[0].Rows[0]["tech_base_asteroid_cap"];
 
 
             }

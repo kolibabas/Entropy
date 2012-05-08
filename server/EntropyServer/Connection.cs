@@ -98,23 +98,16 @@ namespace EntropyServer
                 string user_name = player_str.Substring(2, 100).Trim();
                 string password = player_str.Substring(100, 152).Trim();
 
-                SqlCeDataAdapter adapter = new SqlCeDataAdapter("select * from Player where user_name=\'" + user_name + "\'", ConnectionManager.SQLConnection);
-                DataSet ds = new DataSet();
-                adapter.Fill(ds);
-
-                if (ds.Tables[0].Rows.Count != 0)
+                Query query = new Query("select * from Player where user_name=\'" + user_name + "\'");
+                if (query.result.Tables[0].Rows.Count != 0)
                 {
                     //TODO Send username taken packet
                 }
                 else
                 {
-                    adapter = new SqlCeDataAdapter("select * from Player", ConnectionManager.SQLConnection);
-                    ds = new DataSet();
-                    adapter.Fill(ds);
-
-                    ds.Tables[0].Rows.Add(Player.Default_Player(ds.Tables[0].Rows.Count, user_name, strategy));
-
-                    adapter.Update(ds);
+                    query = new Query("select * from Player");
+                    query.result.Tables[0].Rows.Add(Player.Default_Player(query.result.Tables[0].Rows.Count, user_name, strategy));
+                    query.Update();
 
                     PlayerManager.Create_Player(user_name);
                 }
@@ -132,11 +125,9 @@ namespace EntropyServer
 
             //TODO Sanitize inputs!
 
-            SqlCeDataAdapter adapter = new SqlCeDataAdapter("select * from Player where user_name=\'" + user_name + "\'", ConnectionManager.SQLConnection);
-            DataSet ds = new DataSet();
-            adapter.Fill(ds);
+            Query query = new Query("select * from Player where user_name=\'" + user_name + "\'");
 
-            if (ds.Tables[0].Rows.Count != 0 && ds.Tables[0].Rows[0]["password_hash"].ToString() == password)
+            if (query.result.Tables[0].Rows.Count != 0 && query.result.Tables[0].Rows[0]["password_hash"].ToString() == password)
             {
                 authenticated = true;
                 connected_player_name = user_name;

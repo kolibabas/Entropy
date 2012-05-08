@@ -17,11 +17,9 @@ namespace EntropyServer
         {
             TimeManager.TickEvent += new TimeManager.TickHandler(On_Tick);
 
-            SqlCeDataAdapter adapter = new SqlCeDataAdapter("select * from Player", ConnectionManager.SQLConnection);
-            DataSet ds = new DataSet();
-            adapter.Fill(ds);
+            Query query = new Query("select * from Player");
 
-            foreach (DataRow player_row in ds.Tables[0].Rows)
+            foreach (DataRow player_row in query.result.Tables[0].Rows)
             {
                 Players.Add(player_row["user_name"].ToString(), new Player(player_row["user_name"].ToString()));
             }

@@ -162,11 +162,9 @@ namespace EntropyServer
         public static void Initialize()
         {
             //Build Ship Templates
-            SqlCeDataAdapter adapter = new SqlCeDataAdapter("select * from Ship", ConnectionManager.SQLConnection);
-            DataSet ds = new DataSet();
-            adapter.Fill(ds);
+            Query query = new Query("select * from Ship");
 
-            foreach (DataRow row in ds.Tables[0].Rows)
+            foreach (DataRow row in query.result.Tables[0].Rows)
             {
                 Ship temp_ship = new Ship();
                 temp_ship.type = (SHIP_TYPE)row["type"];
@@ -187,11 +185,9 @@ namespace EntropyServer
             }
 
             //Build Structure Templates
-            adapter = new SqlCeDataAdapter("select * from Structure", ConnectionManager.SQLConnection);
-            ds = new DataSet();
-            adapter.Fill(ds);
+            query = new Query("select * from Structure");
 
-            foreach (DataRow row in ds.Tables[0].Rows)
+            foreach (DataRow row in query.result.Tables[0].Rows)
             {
                 Structure temp_structure = new Structure();
 
