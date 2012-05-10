@@ -125,11 +125,14 @@ namespace EntropyServer
 
 #endregion
 
-        #region Local Variables
+        #region Local Constants
 
         private const int SELL_DIVISOR = 2;
         private const int TRADE_DIVISOR = 10;
         private const int DIRECT_DIVISOR = 50;
+        private const int PIRATE_DIVISOR = 2;
+        private const int STRUCT_DESTROYED_CHANCE = 20;
+        private const int STRUCT_DESTROYED_CHANCE_TARGET = 33;
 
         #endregion
 
@@ -201,6 +204,7 @@ namespace EntropyServer
         {
             Dictionary<ASTEROID_SIZE, int> temp_list = new Dictionary<ASTEROID_SIZE, int>();
 
+            //4 digits per asteroid type
             int small_asteroid_count = int.Parse(text.Substring(0, 4));
             int med_asteroid_count = int.Parse(text.Substring(4, 4));
             int large_asteroid_count = int.Parse(text.Substring(8, 4));
@@ -392,6 +396,105 @@ namespace EntropyServer
 
         #endregion
 
+        #region Serializer
+
+        public void Save_Database_Values()
+        {
+            Query query = new Query("select * from Player where user_name=\'" + this.user_name + "\'");
+
+            if (query.result.Tables[0].Rows.Count != 0)
+            {
+                query.result.Tables[0].Rows[0]["credits_current"] = this.credits_current;
+
+                query.result.Tables[0].Rows[0]["asteroids"] = Serialize_Asteroids(this.Asteroids);
+
+                query.result.Tables[0].Rows[0]["structures"] = Serialize_Structures(this.Structures);
+
+                //Store Ships
+                query.result.Tables[0].Rows[0]["ships_attacking"] = Serialize_Ships(this.Ships_Attacking);
+                query.result.Tables[0].Rows[0]["ships_defending"] = Serialize_Ships(this.Ships_Defending);
+
+                //Store Actions
+                query.result.Tables[0].Rows[0]["action_attack"] = Serialize_Action(this.action_attack);
+                query.result.Tables[0].Rows[0]["action_build_ship"] = Serialize_Action(this.action_build_ship);
+                query.result.Tables[0].Rows[0]["action_build_struct"] = Serialize_Action(this.action_build_struct);
+                query.result.Tables[0].Rows[0]["action_research"] = Serialize_Action(this.action_research);
+                query.result.Tables[0].Rows[0]["action_diplomacy"] = Serialize_Action(this.action_diplomacy);
+                query.result.Tables[0].Rows[0]["action_direct"] = Serialize_Action(this.action_direct);
+
+                //Store Tech Levels
+                query.result.Tables[0].Rows[0]["tech_ship_weapons"] = this.tech_ship_weapons;
+                query.result.Tables[0].Rows[0]["tech_ship_hp"] = this.tech_ship_hp;
+                query.result.Tables[0].Rows[0]["tech_ship_engine"] = this.tech_ship_engine;
+                query.result.Tables[0].Rows[0]["tech_ship_stealth"] = this.tech_ship_stealth;
+                query.result.Tables[0].Rows[0]["tech_struct_weapons"] = this.tech_struct_weapons;
+                query.result.Tables[0].Rows[0]["tech_struct_hp"] = this.tech_struct_hp;
+                query.result.Tables[0].Rows[0]["tech_struct_mining"] = this.tech_struct_econ;
+                query.result.Tables[0].Rows[0]["tech_struct_research"] = this.tech_struct_research;
+                query.result.Tables[0].Rows[0]["tech_struct_diplomacy"] = this.tech_struct_diplomacy;
+                query.result.Tables[0].Rows[0]["tech_construct_speed"] = this.tech_construct_speed;
+                query.result.Tables[0].Rows[0]["tech_base_sensors"] = this.tech_base_sensors;
+                query.result.Tables[0].Rows[0]["tech_base_fleet_cap"] = this.tech_base_fleet_cap;
+                query.result.Tables[0].Rows[0]["tech_base_asteroid_cap"] = this.tech_base_asteroid_cap;
+
+                query.Update();
+            }
+        }
+
+        private string Serialize_Ships(Dictionary<SHIP_TYPE, int> ships)
+        {
+            string result = "";
+
+            foreach (SHIP_TYPE ship_type in GameManager.Ship_Templates.Keys)
+            {
+                //5 digits per ship type
+                result += ships[ship_type].ToString().PadLeft(5, '0');
+            }
+
+            return result;
+        }
+
+        private string Serialize_Structures(Dictionary<STRUCTURE_TYPE, int> structures)
+        {
+            string result = "";
+
+            foreach (STRUCTURE_TYPE structure_type in GameManager.Structure_Templates.Keys)
+            {
+                //5 digits per structure type
+                result += structures[structure_type].ToString().PadLeft(5, '0');
+            }
+
+            return result;
+        }
+
+        private string Serialize_Asteroids(Dictionary<ASTEROID_SIZE, int> asteroids)
+        {
+            string result = "";
+
+            //4 digits per asteroid type
+            result += asteroids[ASTEROID_SIZE.ASTEROID_SMALL].ToString().PadLeft(4, '0');
+            result += asteroids[ASTEROID_SIZE.ASTEROID_MEDIUM].ToString().PadLeft(4, '0');
+            result += asteroids[ASTEROID_SIZE.ASTEROID_LARGE].ToString().PadLeft(4, '0');
+
+            return result;
+        }
+
+        private string Serialize_Action(PlayerAction action)
+        {
+            string result = "";
+
+            //Actions SQL Type (2 digits), Start tick (7 digits), End tick (7 digits), Param (2 digits), Player Name (up to 100 chars) = 118 digits per action
+            result += ((int)action.Type).ToString().PadLeft(2, '0');
+            result += ((int)action.Start_Tick).ToString().PadLeft(7, '0');
+            result += ((int)action.End_Tick).ToString().PadLeft(7, '0');
+            result += ((int)action.Param).ToString().PadLeft(2, '0');
+            result += action.Target_Player_Name.PadLeft(100, '0');
+
+            return result;
+        }
+
+#endregion
+
         #region Tick Processing
 
         public void Do_Tick()
@@ -526,12 +629,40 @@ namespace EntropyServer
             }
         }
 
+        #endregion
+
+        #region Combat
+
         private void Do_Combat(PlayerAction action)
         {
 
             //Get target player
             Player target_player = PlayerManager.Players[action.Target_Player_Name];
 
+            //Compute both player's relevant powers
+            int attacker_power = Combat_Compute_Attacker_Power(action);
+            int defender_power = Combat_Compute_Defender_Power(action, target_player);
+
+            //Compute power difference and victor
+            float differential = attacker_power - defender_power;
+            bool attacker_victory = differential > 0 ? true : false; //GAVIN'S TERNARY STATEMENT
+
+            //Apply damage to attacker
+            Combat_Compute_Attacker_losses(differential, attacker_power, attacker_victory, target_player);
+
+            //Apply damage to defender
+            Combat_Compute_Defender_losses(differential, defender_power, attacker_victory, target_player, action);
+
+            //Shift credits
+            if (attacker_victory)
+            {
+                Combat_Compute_Credit_Transfer(differential, target_player);
+            }
+
+        }
+
+        private int Combat_Compute_Attacker_Power(PlayerAction action)
+        {
             //Compute total attacking power
             int attacker_power = 0;
             foreach (KeyValuePair<SHIP_TYPE, int> pair in this.Ships_Attacking)
@@ -539,6 +670,39 @@ namespace EntropyServer
                 attacker_power += GameManager.Ship_Templates[pair.Key].Combat_Rating * pair.Value * TechManager.Tech_Mod(TECH_TYPE.TECH_SHIP_WEAPONS, this.tech_ship_weapons);
             }
 
+            //Determine which attacking and defending specialty ships (Covert Ops, et al) to add to the scores
+            //Using the same mechanism as above based on attack type
+            switch (action.Type)
+            {
+                case PLAYER_ACTION.ACTION_ATTACK_COMBAT:
+                    break;
+                case PLAYER_ACTION.ACTION_ATTACK_DIPLOMACY:
+                    foreach (KeyValuePair<SHIP_TYPE, int> pair in this.Ships_Attacking)
+                    {
+                        attacker_power += GameManager.Ship_Templates[pair.Key].Bonus_Diplomacy * pair.Value;
+                    }
+                    break;
+                case PLAYER_ACTION.ACTION_ATTACK_ECON:
+                    foreach (KeyValuePair<SHIP_TYPE, int> pair in this.Ships_Attacking)
+                    {
+                        attacker_power += GameManager.Ship_Templates[pair.Key].Bonus_Econ * pair.Value;
+                    }
+                    break;
+                case PLAYER_ACTION.ACTION_ATTACK_TECH:
+                    foreach (KeyValuePair<SHIP_TYPE, int> pair in this.Ships_Attacking)
+                    {
+                        attacker_power += GameManager.Ship_Templates[pair.Key].Bonus_Tech * pair.Value;
+                    }
+                    break;
+                default:
+                    break;
+            }
+
+            return attacker_power;
+        }
+
+        private int Combat_Compute_Defender_Power(PlayerAction action, Player target_player)
+        {
             //Compute Defender combat power
             //Add raw power from ships defending
             int defender_power = 0;
@@ -569,11 +733,6 @@ namespace EntropyServer
                 case PLAYER_ACTION.ACTION_ATTACK_COMBAT:
                     break;
                 case PLAYER_ACTION.ACTION_ATTACK_DIPLOMACY:
-                    foreach (KeyValuePair<SHIP_TYPE, int> pair in this.Ships_Attacking)
-                    {
-                        attacker_power += GameManager.Ship_Templates[pair.Key].Bonus_Diplomacy * pair.Value;
-                    }
-
                     foreach (KeyValuePair<SHIP_TYPE, int> pair in target_player.Ships_Defending)
                     {
                         defender_power += GameManager.Ship_Templates[pair.Key].Bonus_Diplomacy * pair.Value;
@@ -588,11 +747,6 @@ namespace EntropyServer
                     }
                     break;
                 case PLAYER_ACTION.ACTION_ATTACK_ECON:
-                    foreach (KeyValuePair<SHIP_TYPE, int> pair in this.Ships_Attacking)
-                    {
-                        attacker_power += GameManager.Ship_Templates[pair.Key].Bonus_Econ * pair.Value;
-                    }
-
                     foreach (KeyValuePair<SHIP_TYPE, int> pair in target_player.Ships_Defending)
                     {
                         defender_power += GameManager.Ship_Templates[pair.Key].Bonus_Econ * pair.Value;
@@ -607,11 +761,6 @@ namespace EntropyServer
                     }
                     break;
                 case PLAYER_ACTION.ACTION_ATTACK_TECH:
-                    foreach (KeyValuePair<SHIP_TYPE, int> pair in this.Ships_Attacking)
-                    {
-                        attacker_power += GameManager.Ship_Templates[pair.Key].Bonus_Tech * pair.Value;
-                    }
-
                     foreach (KeyValuePair<SHIP_TYPE, int> pair in target_player.Ships_Defending)
                     {
                         defender_power += GameManager.Ship_Templates[pair.Key].Bonus_Tech * pair.Value;
@@ -629,10 +778,11 @@ namespace EntropyServer
                     break;
             }
 
-            //Compute power difference and victor
-            float differential = attacker_power - defender_power;
-            bool attacker_victory = differential > 0 ? true : false; //TODO GAVIN'S TERNARY STATEMENT
+            return defender_power;
+        }
 
+        private void Combat_Compute_Attacker_losses(float differential, int attacker_power, bool attacker_victory, Player target_player)
+        {
             //Attacker can only lose HP from ships that attacked
             //If they won, limit losses to 20% of differential
             int attacker_hp_loss = 0;
@@ -643,6 +793,33 @@ namespace EntropyServer
             }
             float attacker_loss_mod = attacker_victory ? 0.2f : 0.8f;
             attacker_hp_loss = (int)((differential / (float)attacker_power) * total_attack_hp * attacker_loss_mod);
+
+            //Select destroyed ships and structures
+            Random rand = new Random();
+            int offense_combat_rolls = 0;
+            int max_offense_combat_rolls = attacker_hp_loss;
+            while (attacker_hp_loss > 0)
+            {
+                SHIP_TYPE destroyed_ship = (SHIP_TYPE)rand.Next((int)SHIP_TYPE.SHIP_LAST_SHIP);
+
+                //If there is an attacking ship of this type, destroy it, reduce HP loss by its HP
+                if (this.Ships_Attacking[destroyed_ship] > 0)
+                {
+                    this.Ships_Attacking[destroyed_ship]--;
+                    attacker_hp_loss -= GameManager.Ship_Templates[destroyed_ship].HP * TechManager.Tech_Mod(TECH_TYPE.TECH_SHIP_HP, this.tech_ship_hp);
+                }
+
+                //Terminate combat eventually if not losing anything
+                offense_combat_rolls++;
+                if (offense_combat_rolls > max_offense_combat_rolls)
+                {
+                    break;
+                }
+            }
+        }
+
+        private void Combat_Compute_Defender_losses(float differential, int defender_power, bool attacker_victory, Player target_player, PlayerAction action)
+        {
 
             //Defender can lose any ship present and any structure that was targeted
             int defender_hp_loss = 0;
@@ -689,26 +866,121 @@ namespace EntropyServer
 
             //If defender won, limit losses to 20%
             float defender_loss_mod = attacker_victory ? 0.8f : 0.2f;
-            defender_hp_loss = (int)((differential / (float)attacker_power) * total_defend_hp * defender_loss_mod);
+            defender_hp_loss = (int)((differential / (float)defender_power) * total_defend_hp * defender_loss_mod);
 
-            //Select destroyed ships and structures
-            Random rand = new Random();
-            while (attacker_hp_loss > 0)
+            //Defender losses, decide between ships and structures
+            int defense_combat_rolls = 0;
+            int max_defense_combat_rolls = defender_hp_loss;
+            while (defender_hp_loss > 0)
             {
-                SHIP_TYPE destroyed_ship = (SHIP_TYPE)rand.Next((int)SHIP_TYPE.SHIP_LAST_SHIP);
-
-                //If there is an attacking ship of this type, destroy it, reduce HP loss by its HP
-                if (this.Ships_Attacking[destroyed_ship] > 0)
+                Random rand = new Random();
+                int target_roll = rand.Next(100);
+                if (target_roll < STRUCT_DESTROYED_CHANCE && action.Type == PLAYER_ACTION.ACTION_ATTACK_COMBAT)
                 {
-                    this.Ships_Attacking[destroyed_ship]--;
-                    attacker_hp_loss -= GameManager.Ship_Templates[destroyed_ship].HP * TechManager.Tech_Mod(TECH_TYPE.TECH_SHIP_HP, this.tech_ship_hp);
+                    STRUCTURE_TYPE destroyed_struct = (STRUCTURE_TYPE)rand.Next((int)STRUCTURE_TYPE.STRUCT_LAST_STRUCT);
+
+                    //If the selected structure type exists, destroy it
+                    if (target_player.Structures[destroyed_struct] > 0)
+                    {
+                        target_player.Structures[destroyed_struct]--;
+                        defender_hp_loss -= GameManager.Structure_Templates[destroyed_struct].HP * TechManager.Tech_Mod(TECH_TYPE.TECH_STRUCT_HP, target_player.tech_struct_hp);
+                    }
+                }
+                else if (target_roll < STRUCT_DESTROYED_CHANCE_TARGET && action.Type != PLAYER_ACTION.ACTION_ATTACK_COMBAT)
+                {
+                    List<STRUCTURE_TYPE> target_types = new List<STRUCTURE_TYPE>();
+                    switch (action.Type)
+                    {
+                        case PLAYER_ACTION.ACTION_ATTACK_DIPLOMACY:
+                            foreach (KeyValuePair<STRUCTURE_TYPE, Structure> struct_type in GameManager.Structure_Templates)
+                            {
+                                if (struct_type.Value.Bonus_Diplomacy > 0)
+                                {
+                                    target_types.Add(struct_type.Key);
+                                }
+                            }
+                            break;
+                        case PLAYER_ACTION.ACTION_ATTACK_ECON:
+                            foreach (KeyValuePair<STRUCTURE_TYPE, Structure> struct_type in GameManager.Structure_Templates)
+                            {
+                                if (struct_type.Value.Bonus_Econ > 0)
+                                {
+                                    target_types.Add(struct_type.Key);
+                                }
+                            }
+                            break;
+                        case PLAYER_ACTION.ACTION_ATTACK_TECH:
+                            foreach (KeyValuePair<STRUCTURE_TYPE, Structure> struct_type in GameManager.Structure_Templates)
+                            {
+                                if (struct_type.Value.Bonus_Tech > 0)
+                                {
+                                    target_types.Add(struct_type.Key);
+                                }
+                            }
+                            break;
+                    }
+
+                    //If the target has one of the valid structures, destroy it
+                    //If not, the loop continues to find a ship
+                    foreach (STRUCTURE_TYPE destroyed_struct in target_types)
+                    {
+                        if (target_player.Structures[destroyed_struct] > 0)
+                        {
+                            target_player.Structures[destroyed_struct]--;
+                            defender_hp_loss -= GameManager.Structure_Templates[destroyed_struct].HP * TechManager.Tech_Mod(TECH_TYPE.TECH_STRUCT_HP, target_player.tech_struct_hp);
+                            break;
+                        }
+                    }
+
+                }
+                else
+                {
+                    SHIP_TYPE destroyed_ship = (SHIP_TYPE)rand.Next((int)SHIP_TYPE.SHIP_LAST_SHIP);
+
+                    //If there is an defending ship of this type, destroy it, reduce HP loss by its HP
+                    if (target_player.Ships_Defending[destroyed_ship] > 0)
+                    {
+                        target_player.Ships_Defending[destroyed_ship]--;
+                        defender_hp_loss -= GameManager.Ship_Templates[destroyed_ship].HP * TechManager.Tech_Mod(TECH_TYPE.TECH_SHIP_HP, target_player.tech_ship_hp);
+                    }
+                    //Else if target player has a ship marked for attack that is at home, destroy it
+                    else if (target_player.Ships_Attacking[destroyed_ship] > 0 && target_player.fleet_at_home)
+                    {
+                        target_player.Ships_Defending[destroyed_ship]--;
+                        defender_hp_loss -= GameManager.Ship_Templates[destroyed_ship].HP * TechManager.Tech_Mod(TECH_TYPE.TECH_SHIP_HP, target_player.tech_ship_hp);
+                    }
+                }
+
+                //Terminate combat eventually if not losing anything
+                defense_combat_rolls++;
+                if (defense_combat_rolls > max_defense_combat_rolls)
+                {
+                    break;
                 }
             }
+        }
 
-            //TODO Defender losses, decide between ships and structures
+        private void Combat_Compute_Credit_Transfer(float differential, Player target_player)
+        {
+            //Compute Credit Transfer
+            if (target_player.credits_current > differential)
+            {
+                target_player.credits_current -= (int)differential;
+
+                if (this.strategy == PLAYER_STRAT.STRAT_PIRATE)
+                {
+                    this.credits_current += (int)differential / PIRATE_DIVISOR;
+                }
+                else
+                {
+                    this.credits_current += (int)differential;
+                }
+            }
+            //Else the target was massively outclassed, no plundering the weak
         }
 
         #endregion
+
 
     }
 }

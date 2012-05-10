@@ -34,12 +34,19 @@ namespace EntropyServer
 
         public static void On_Tick()
         {
+            //Update all players
             foreach (Player p in Players.Values)
             {
                 p.Do_Tick();
             }
 
-            //TODO Back up database. Write updated values to database
+            //After all players have updated, write it to the DB
+            foreach (Player p in Players.Values)
+            {
+                p.Save_Database_Values();
+            }
+
+            //TODO Back up Database file
         }
     }
 }
