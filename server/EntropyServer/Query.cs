@@ -15,7 +15,7 @@ namespace EntropyServer
         #region Constructor
         public Query(string user_query)
         {
-            adapter = new SqlCeDataAdapter( user_query, ConnectionManager.SQLConnection);
+            adapter = new SqlCeDataAdapter( user_query, ConnectionManager.SQL_Connection);
             result = new DataSet();
             adapter.Fill(result);
         }

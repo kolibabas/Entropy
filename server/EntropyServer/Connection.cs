@@ -14,7 +14,10 @@ namespace EntropyServer
     {
         public static int CONNECTION_TIMEOUT_SECS = 600;
 
-        public TcpClient Client { get; set; }
+        public const int PKT_LEN = 255;
+
+        public TcpClient client { get; set; }
+        public NetworkStream client_stream { get; set; }
         public int conn_num { get; set; }
         public string connected_player_name = "";
 
@@ -23,7 +26,8 @@ namespace EntropyServer
 
         public Connection(TcpClient client, int conn_num)
         {
-            this.Client = client;
+            this.client = client;
+            this.client_stream = client.GetStream();
             this.conn_num = conn_num;
             this.lastMessageTime = DateTime.Now;
         }
@@ -44,14 +48,14 @@ namespace EntropyServer
 
         public void Parse_Input(string input)
         {
-            //CMD_ID length is 3
+            //IOP_PKT_ID length is 3
             //PARAM length is 252
             if (input.Length == 255)
             {
                 try
                 {
                     string cmd_id_str = input.Substring(0, 3);
-                    CMD_ID cmd_id = (CMD_ID)int.Parse(cmd_id_str);
+                    IOP_PKT_ID cmd_id = (IOP_PKT_ID)int.Parse(cmd_id_str);
 
                     string param_str = input.Substring(3);
 
@@ -68,18 +72,20 @@ namespace EntropyServer
             }
         }
 
-        private void Process_Input(CMD_ID cmd, string param)
+        #region Input Processing
+
+        private void Process_Input(IOP_PKT_ID cmd, string param)
         {
             lastMessageTime = DateTime.Now;
 
-            if (authenticated == true || cmd == CMD_ID.CMD_AUTH)
+            if (authenticated == true || cmd == IOP_PKT_ID.IOP_PKT_ID_AUTH_PLAYER)
             {
                 switch (cmd)
                 {
-                    case CMD_ID.CMD_CREATE:
+                    case IOP_PKT_ID.IOP_PKT_ID_CREATE_PLAYER:
                         Create_Player(param);
                         break;
-                    case CMD_ID.CMD_AUTH:
+                    case IOP_PKT_ID.IOP_PKT_ID_AUTH_PLAYER:
                         authenticated = false;
                         Authenticate(param);
                         break;
@@ -141,5 +147,38 @@ namespace EntropyServer
                 //TODO Send invalid authentication packet
             }
         }
+
+        #endregion
+
+        #region Output Processing
+
+        public void Send_IOP_PKT_ID_ACK(IOP_PKT_ID ack_pkt_id)
+        {
+
+            string packet = GameManager.PKT_ID_To_String(IOP_PKT_ID.IOP_PKT_ID_ACK);
+            packet += GameManager.PKT_ID_To_String(ack_pkt_id);
+
+            Send_Packet(packet);
+        }
+
+        public void Send_IOP_PKT_ID_NACK(IOP_PKT_ID nack_pkt_id)
+        {
+
+            string packet = GameManager.PKT_ID_To_String(IOP_PKT_ID.IOP_PKT_ID_NACK);
+            packet += GameManager.PKT_ID_To_String(nack_pkt_id);
+
+            Send_Packet(packet);
+        }
+
+        private void Send_Packet(string packet)
+        {
+            packet.PadRight(PKT_LEN, '0');
+            byte[] message = System.Text.Encoding.UTF8.GetBytes(packet);
+            client_stream.Write(message, 0, PKT_LEN);
+        }
+
+        #endregion
+
+
     }
 }

@@ -14,40 +14,40 @@ namespace EntropyServer
 
     static class ConnectionManager
     {
-        public static SqlCeConnection SQLConnection;
+        public static SqlCeConnection SQL_Connection;
         public static List<Connection> Connections { get; set; }
 
-        private static TcpListener tcpListener;
-        private static Thread listenThread;
-        private static List<Thread> clientThreads;
+        private static TcpListener tcp_listener;
+        private static Thread listen_thread;
+        private static List<Thread> client_threads;
         private static int port;
 
         public static void Initialize(int p)
         {
             Connections = new List<Connection>();
-            clientThreads = new List<Thread>();
+            client_threads = new List<Thread>();
 
             TimeManager.SecondChangeEvent += new TimeManager.SecondChangeHandler(SecondChanged);
 
-            ConnectDatabase();
+            Connect_Database();
 
             GameManager.Initialize();
 
             port = p;
-            tcpListener = new TcpListener(IPAddress.Any, port);
-            listenThread = new Thread(new ThreadStart(ListenForClients));
-            listenThread.Start();
+            tcp_listener = new TcpListener(IPAddress.Any, port);
+            listen_thread = new Thread(new ThreadStart(Listen_For_Clients));
+            listen_thread.Start();
 
         }
 
-        public static void ConnectDatabase()
+        public static void Connect_Database()
         {
             try
             {
-                string dbfile = new System.IO.FileInfo(System.Reflection.Assembly.GetExecutingAssembly().Location).DirectoryName + "\\PlayerDatabase.sdf";
-                SQLConnection = new SqlCeConnection("datasource=" + dbfile);
+                string db_file = new System.IO.FileInfo(System.Reflection.Assembly.GetExecutingAssembly().Location).DirectoryName + "\\PlayerDatabase.sdf";
+                SQL_Connection = new SqlCeConnection("datasource=" + db_file);
 
-                SQLConnection.Open();
+                SQL_Connection.Open();
 
                 MainForm.Log("Database Connection Established");
                 MainForm.Log("ConnectionManager Initialized");
@@ -62,23 +62,23 @@ namespace EntropyServer
         {
             foreach (Connection conn in Connections)
             {
-                conn.Client.Close();
+                conn.client.Close();
             }
 
-            foreach (Thread cl in clientThreads)
+            foreach (Thread cl in client_threads)
             {
                 cl.Abort();
             }
 
-            SQLConnection.Close();
+            SQL_Connection.Close();
 
-            tcpListener.Stop();
-            listenThread.Abort();   
+            tcp_listener.Stop();
+            listen_thread.Abort();   
         }
 
-        private static void ListenForClients()
+        private static void Listen_For_Clients()
         {
-            tcpListener.Start();
+            tcp_listener.Start();
 
             MainForm.Log("Listen Server Started, now accepting clients");
 
@@ -87,14 +87,14 @@ namespace EntropyServer
                 try
                 {
                     //blocks until a client has connected to the server
-                    TcpClient client = tcpListener.AcceptTcpClient();
+                    TcpClient client = tcp_listener.AcceptTcpClient();
 
                     MainForm.Log("Client " + Connections.Count + " Connected! Waiting for Auth...");
 
                     //create a thread to handle communication
                     //with connected client
-                    clientThreads.Add(new Thread(new ParameterizedThreadStart(HandleClientComm)));
-                    clientThreads[clientThreads.Count - 1].Start(client);
+                    client_threads.Add(new Thread(new ParameterizedThreadStart(Handle_Client_Comm)));
+                    client_threads[client_threads.Count - 1].Start(client);
                 }
                 catch (Exception)
                 {
@@ -102,27 +102,28 @@ namespace EntropyServer
                 }
             }
 
-            tcpListener.Stop();
+            tcp_listener.Stop();
         }
 
-        private static void HandleClientComm(object client)
+        private static void Handle_Client_Comm(object client)
         {
-            TcpClient tcpClient = (TcpClient)client;
-            NetworkStream clientStream = tcpClient.GetStream();
+            TcpClient tcp_client = (TcpClient)client;
+            NetworkStream client_stream = tcp_client.GetStream();
 
-            Connections.Add(new Connection(tcpClient, Connections.Count));
+            Connection new_connection = new Connection(tcp_client, Connections.Count);
+            Connections.Add(new_connection);
 
             byte[] message = new byte[4096];
-            int bytesRead;
+            int bytes_read;
 
             while (!MainForm.Shutdown_Requested)
             {
-                bytesRead = 0;
+                bytes_read = 0;
 
                 try
                 {
                     //blocks until a client sends a message
-                    bytesRead = clientStream.Read(message, 0, 4096);
+                    bytes_read = client_stream.Read(message, 0, 4096);
                 }
                 catch
                 {
@@ -130,7 +131,7 @@ namespace EntropyServer
                     break;
                 }
 
-                if (bytesRead == 0)
+                if (bytes_read == 0)
                 {
                     //the client has disconnected from the server
                     break;
@@ -138,8 +139,11 @@ namespace EntropyServer
 
                 //message has successfully been received
                 ASCIIEncoding encoder = new ASCIIEncoding();
-                string rxString = encoder.GetString(message, 0, bytesRead);
-                MainForm.Log("Got Message from Client: " + rxString);
+                string rx_string = encoder.GetString(message, 0, bytes_read);
+                
+                //Tell connection to parse it
+                new_connection.Parse_Input(rx_string);
+                MainForm.Log("Got Message from Client: " + new_connection.conn_num + ": " + rx_string);
             }
         }
 
@@ -158,7 +162,7 @@ namespace EntropyServer
             foreach (Connection conn in timed_out_connections)
             {
                 MainForm.Log("Client " + conn.conn_num + " timed out!");
-                conn.Client.Close();
+                conn.client.Close();
                 Connections.Remove(conn);
             }
 

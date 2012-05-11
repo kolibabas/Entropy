@@ -8,17 +8,25 @@ using System.Data;
 
 namespace EntropyServer
 {
-    public enum CMD_ID
+    public enum IOP_PKT_ID
     {
-        CMD_CREATE,
-        CMD_AUTH,
-        CMD_DISCONNECT,
-        CMD_REFER,
-        CMD_NOTIFY_RQST,
-        CMD_NOTIFY_RXD,
-        CMD_ACTION,
-        CMD_ACTION_CANCEL,
-        CMD_MAX_CMD_ID,
+        //Server TX Packet IDs
+        IOP_PKT_ID_ACK,             
+        IOP_PKT_ID_NACK,            //TODO
+        IOP_PKT_ID_PLAYER_DATA,     //TODO
+        IOP_PKT_ID_NOTIFY,          //TODO
+        IOP_PKT_ID_ANNOUNCE,        //TODO
+        IOP_PKT_ID_WORLD_DATA,      //TODO
+
+        //Client TX Packet IDs
+        IOP_PKT_ID_CREATE_PLAYER,
+        IOP_PKT_ID_AUTH_PLAYER,
+        IOP_PKT_ID_ACTION,          //TODO
+        IOP_PKT_ID_ACTION_CANCEL,   //TODO
+        IOP_PKT_ID_RQST_PLAYER_DATA,//TODO
+        IOP_PKT_ID_RQST_WORLD_DATA, //TODO
+
+        IOP_PKT_ID_MAX_PKT_ID,
     };
 
     public enum PLAYER_ACTION
@@ -212,6 +220,11 @@ namespace EntropyServer
 
             Game_Initialized = true;
             MainForm.Log("GameManager Initialized");
+        }
+
+        public static string PKT_ID_To_String(IOP_PKT_ID pkt_id)
+        {
+            return ((int)pkt_id).ToString().PadLeft(2, '0');
         }
     }
 }
