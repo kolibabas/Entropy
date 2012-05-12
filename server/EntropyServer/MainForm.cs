@@ -25,12 +25,18 @@ namespace EntropyServer
             Log("Welcome to Entropy. Enjoy your stay.");
 
             this.gameClock = new GameClock(5);
+            this.gameClock.TickEvent += new GameClock.TickHandler(gameClock_TickEvent);
             this.gameClock.Start();
             ConnectionManager.Initialize( this.gameClock, 8080 );
             PlayerManager.Initialize(this.gameClock);
 
             MainForm.Log("Entropy Must Increase");
-            MainForm.Log("Tick 0 Started at " + DateTime.Now.ToString());
+            outputTickStamp(0);
+        }
+
+        void gameClock_TickEvent(object sender, TickEventArgs args)
+        {
+            outputTickStamp(args.CurrentTick);
         }
 
         private void inputTextBox_KeyDown(object sender, KeyEventArgs e)
@@ -126,6 +132,11 @@ namespace EntropyServer
             {
                 e.Cancel = true;
             }
+        }
+
+        private void outputTickStamp(int tickNumber)
+        {
+            MainForm.Log(String.Format("Tick {0:d} started at {1:s}", tickNumber, DateTime.Now.ToString()));
         }
     }
 }
