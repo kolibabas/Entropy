@@ -9,8 +9,7 @@ namespace EntropyServer.Engine
     public class GameClock
     {
         //Constants
-        private const int DefaultTick = 5;
-        private const int MillisecondsInOneSecond = 1000;
+        private const int DefaultTickInSeconds = 5;
 
         //Events
         public delegate void TickHandler(object sender, TickEventArgs args);
@@ -20,15 +19,15 @@ namespace EntropyServer.Engine
 
         //Private data
         private int tick;
-        private int runningTime;
+        private TimeSpan runningTime;
         private Timer secondTimer;
         private Timer tickTimer;
-        private int currentTickCountdown;
-        private int tickDurationUsed; //tick can be changed after it is started
+        private TimeSpan currentTickCountdown;
+        private TimeSpan tickDurationUsed; //tick can be changed after it is started
         private static System.Threading.Mutex mut = new System.Threading.Mutex();
 
         //Read/write properties
-        public int TickDurationInSeconds
+        public TimeSpan TickDuration
         {
             get;
             set;
@@ -42,14 +41,14 @@ namespace EntropyServer.Engine
                 return this.tick;
             }
         }
-        public int RunningTime
+        public TimeSpan RunningTime
         {
             get
             {
                 return this.runningTime;
             }
         }
-        public int CurrentTickSecondsLeft
+        public TimeSpan CurrentTickTimeLeft
         {
             get
             {
@@ -58,32 +57,32 @@ namespace EntropyServer.Engine
         }
 
 
-        public GameClock(int tickDuration)
+        public GameClock(TimeSpan tickDuration)
         {
             this.tick = 0;
-            this.runningTime = 0;
-            this.currentTickCountdown = 0;
+            this.runningTime = TimeSpan.FromSeconds(0.0D);
+            this.currentTickCountdown = TimeSpan.FromSeconds(0.0D);
             this.tickTimer = null;
             this.secondTimer = null;
-            this.TickDurationInSeconds = tickDuration;
+            this.TickDuration = tickDuration;
         }
 
-        public GameClock() : this(DefaultTick)
+        public GameClock() : this(TimeSpan.FromSeconds((double)DefaultTickInSeconds))
         {}
 
         //Public functions
         public void Start()
         {
             this.tick = 0;
-            this.runningTime = 0;
+            this.runningTime = TimeSpan.FromSeconds(0.0D);
 
             // set a tick that only gets saved when started so it
             // stays the same while running
-            this.tickDurationUsed = this.TickDurationInSeconds;
+            this.tickDurationUsed = this.TickDuration;
             this.currentTickCountdown = this.tickDurationUsed;
 
-            this.secondTimer = new Timer(1 * MillisecondsInOneSecond);
-            this.tickTimer = new Timer(this.tickDurationUsed * MillisecondsInOneSecond);
+            this.secondTimer = new Timer(TimeSpan.FromSeconds(1.0D).TotalMilliseconds);
+            this.tickTimer = new Timer(this.tickDurationUsed.TotalMilliseconds);
 
             this.tickTimer.Elapsed += new ElapsedEventHandler(OnTickEvent);
             this.secondTimer.Elapsed += new ElapsedEventHandler(OnSecondElapsedEvent);
@@ -101,8 +100,8 @@ namespace EntropyServer.Engine
 
             //reset internal data so time remaining and such is zeroed
             this.tick = 0;
-            this.runningTime = 0;
-            this.currentTickCountdown = 0;
+            this.runningTime = TimeSpan.FromSeconds(0.0D);
+            this.currentTickCountdown = TimeSpan.FromSeconds(0.0D);
         }
 
         public void Pause()
@@ -148,14 +147,13 @@ namespace EntropyServer.Engine
             //protected code while modifying object state
             mut.WaitOne();
 
-            this.runningTime += 1;
-            this.currentTickCountdown--;
-
+            this.runningTime += TimeSpan.FromMilliseconds(((Timer)sender).Interval);
+            this.currentTickCountdown -= TimeSpan.FromMilliseconds(((Timer)sender).Interval);
             mut.ReleaseMutex();
 
             SecondElapsedEventArgs eventArgs = new SecondElapsedEventArgs();
             eventArgs.CurrentTick = this.CurrentTick;
-            eventArgs.CurrentTickSecondsLeft = this.CurrentTickSecondsLeft;
+            eventArgs.CurrentTickTimeLeft = this.CurrentTickTimeLeft;
             eventArgs.RunningTime = this.RunningTime;
 
             //the user callbacks are not in protected code
@@ -172,7 +170,7 @@ namespace EntropyServer.Engine
         public int CurrentTick
         { get; set; }
 
-        public int RunningTime
+        public TimeSpan RunningTime
         { get; set; }
     }
 
@@ -181,10 +179,10 @@ namespace EntropyServer.Engine
         public int CurrentTick
         { get; set; }
 
-        public int CurrentTickSecondsLeft
+        public TimeSpan CurrentTickTimeLeft
         { get; set; }
 
-        public int RunningTime
+        public TimeSpan RunningTime
         { get; set; }
     }
 }

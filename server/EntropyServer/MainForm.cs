@@ -24,7 +24,7 @@ namespace EntropyServer
 
             Log("Welcome to Entropy. Enjoy your stay.");
 
-            this.gameClock = new GameClock(5);
+            this.gameClock = new GameClock(TimeSpan.FromSeconds(5.0D));
             this.gameClock.TickEvent += new GameClock.TickHandler(gameClock_TickEvent);
             this.gameClock.Start();
             ConnectionManager.Initialize( this.gameClock, 8080 );
@@ -71,14 +71,14 @@ namespace EntropyServer
                     break;
                 case "uptime":
                 case "u":
-                    TimeSpan t = TimeSpan.FromSeconds(this.gameClock.RunningTime);
+                    TimeSpan t = this.gameClock.RunningTime;
 
                     Log("Server Uptime: " + t.ToString());
                     break;
                 case "tick":
                 case "ticks":
                 case "t":
-                    Log("Tick Info: Tick #" + this.gameClock.CurrentTick + " | Seconds Until Next Tick: " + this.gameClock.CurrentTickSecondsLeft);
+                    Log("Tick Info: Tick #" + this.gameClock.CurrentTick + " | Seconds Until Next Tick: " + this.gameClock.CurrentTickTimeLeft);
                     break;
                 case "client":
                 case "clients":
