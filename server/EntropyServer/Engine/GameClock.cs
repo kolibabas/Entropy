@@ -129,11 +129,11 @@ namespace EntropyServer.Engine
             //restart the tick countdown
             this.currentTickCountdown = this.tickDurationUsed;
 
-            mut.ReleaseMutex();
-
             TickEventArgs eventArgs = new TickEventArgs();
             eventArgs.CurrentTick = this.CurrentTick;
             eventArgs.RunningTime = this.RunningTime;
+
+            mut.ReleaseMutex();
 
             //the user callbacks are not in protected code
             if (this.TickEvent != null)
@@ -149,12 +149,13 @@ namespace EntropyServer.Engine
 
             this.runningTime += TimeSpan.FromMilliseconds(((Timer)sender).Interval);
             this.currentTickCountdown -= TimeSpan.FromMilliseconds(((Timer)sender).Interval);
-            mut.ReleaseMutex();
-
+            
             SecondElapsedEventArgs eventArgs = new SecondElapsedEventArgs();
             eventArgs.CurrentTick = this.CurrentTick;
             eventArgs.CurrentTickTimeLeft = this.CurrentTickTimeLeft;
             eventArgs.RunningTime = this.RunningTime;
+
+            mut.ReleaseMutex();
 
             //the user callbacks are not in protected code
             if (this.SecondElapsedEvent != null)
