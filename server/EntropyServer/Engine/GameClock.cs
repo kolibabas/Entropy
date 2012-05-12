@@ -132,11 +132,14 @@ namespace EntropyServer.Engine
 
             mut.ReleaseMutex();
 
+            TickEventArgs eventArgs = new TickEventArgs();
+            eventArgs.CurrentTick = this.CurrentTick;
+            eventArgs.RunningTime = this.RunningTime;
 
             //the user callbacks are not in protected code
             if (this.TickEvent != null)
             {
-                this.TickEvent(this, new TickEventArgs());
+                this.TickEvent(this, eventArgs);
             }
         }
 
@@ -150,11 +153,15 @@ namespace EntropyServer.Engine
 
             mut.ReleaseMutex();
 
+            SecondElapsedEventArgs eventArgs = new SecondElapsedEventArgs();
+            eventArgs.CurrentTick = this.CurrentTick;
+            eventArgs.CurrentTickSecondsLeft = this.CurrentTickSecondsLeft;
+            eventArgs.RunningTime = this.RunningTime;
 
             //the user callbacks are not in protected code
             if (this.SecondElapsedEvent != null)
             {
-                this.SecondElapsedEvent(this, new SecondElapsedEventArgs());
+                this.SecondElapsedEvent(this, eventArgs);
             }
         }
 
@@ -162,13 +169,22 @@ namespace EntropyServer.Engine
 
     public class TickEventArgs
     {
-        //TODO: add arguments for tick event.
-        //ideas: tick number, time in world
+        public int CurrentTick
+        { get; set; }
+
+        public int RunningTime
+        { get; set; }
     }
 
     public class SecondElapsedEventArgs
     {
-        //TODO: add arguments for tick event
-        //ideas: tick number, time left in tick, time in world
+        public int CurrentTick
+        { get; set; }
+
+        public int CurrentTickSecondsLeft
+        { get; set; }
+
+        public int RunningTime
+        { get; set; }
     }
 }
