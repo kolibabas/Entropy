@@ -8,6 +8,7 @@ using System.Threading;
 using System.Net;
 using System.Data.SqlServerCe;
 using System.Data;
+using EntropyServer.Engine;
 
 namespace EntropyServer
 {
@@ -21,13 +22,14 @@ namespace EntropyServer
         private static Thread listen_thread;
         private static List<Thread> client_threads;
         private static int port;
+        private static GameClock gameClock;
 
-        public static void Initialize(int p)
+        public static void Initialize( GameClock gameClock, int p )
         {
             Connections = new List<Connection>();
             client_threads = new List<Thread>();
 
-            TimeManager.SecondChangeEvent += new TimeManager.SecondChangeHandler(SecondChanged);
+            gameClock.SecondElapsedEvent += new GameClock.SecondElapsedHandler(SecondChanged);
 
             Connect_Database();
 
@@ -147,7 +149,7 @@ namespace EntropyServer
             }
         }
 
-        private static void SecondChanged()
+        private static void SecondChanged(object sender, SecondElapsedEventArgs args)
         {
             List<Connection> timed_out_connections = new List<Connection>();
 

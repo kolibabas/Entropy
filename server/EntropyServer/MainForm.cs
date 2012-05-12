@@ -6,12 +6,15 @@ using System.Drawing;
 using System.Linq;
 using System.Text;
 using System.Windows.Forms;
+using EntropyServer.Engine;
 
 namespace EntropyServer
 {
     public partial class MainForm : Form
     {
         private delegate void LogInvokeDelegate(string text);
+
+        private GameClock gameClock;
 
         public static bool Shutdown_Requested = false;
 
@@ -21,9 +24,10 @@ namespace EntropyServer
 
             Log("Welcome to Entropy. Enjoy your stay.");
 
-            TimeManager.Initialize();
-            ConnectionManager.Initialize(8080);
-            PlayerManager.Initialize();
+            this.gameClock = new GameClock(5);
+            this.gameClock.Start();
+            ConnectionManager.Initialize( this.gameClock, 8080 );
+            PlayerManager.Initialize(this.gameClock);
 
             MainForm.Log("Entropy Must Increase");
             MainForm.Log("Tick 0 Started at " + DateTime.Now.ToString());
@@ -61,14 +65,14 @@ namespace EntropyServer
                     break;
                 case "uptime":
                 case "u":
-                    TimeSpan t = TimeSpan.FromSeconds(TimeManager.Uptime_Secs);
+                    TimeSpan t = TimeSpan.FromSeconds(this.gameClock.RunningTime);
 
                     Log("Server Uptime: " + t.ToString());
                     break;
                 case "tick":
                 case "ticks":
                 case "t":
-                    Log("Tick Info: Tick #" + TimeManager.Tick + " | Seconds Until Next Tick: " + TimeManager.Secs_Left_This_Tick);
+                    Log("Tick Info: Tick #" + this.gameClock.CurrentTick + " | Seconds Until Next Tick: " + this.gameClock.CurrentTickSecondsLeft);
                     break;
                 case "client":
                 case "clients":
@@ -115,7 +119,7 @@ namespace EntropyServer
                 Shutdown_Requested = true;
                 System.Threading.Thread.Sleep(2000);
                 ConnectionManager.Shutdown();
-                TimeManager.Shutdown();
+                gameClock.Stop();
                 //TODO Write to database
             }
             else

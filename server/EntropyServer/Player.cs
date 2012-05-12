@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Data.SqlServerCe;
 using System.Data;
+using EntropyServer.Engine;
 
 namespace EntropyServer
 {
@@ -137,17 +138,17 @@ namespace EntropyServer
         #endregion
 
         #region Constructor
-        public Player(string user_name)
+        public Player(string user_name, GameClock gameClock)
         {
             this.user_name = user_name;
 
             //Populate all player data
 
             Load_Database_Values();
-            Compute_Credits();
-            Compute_Research();
-            Compute_Ship_Pop();
-            Compute_Scores();
+            Compute_Credits(gameClock);
+            Compute_Research(gameClock);
+            Compute_Ship_Pop(gameClock);
+            Compute_Scores(gameClock);
         }
 
         private void Load_Database_Values()
@@ -260,7 +261,7 @@ namespace EntropyServer
             return temp_action;
         }
 
-        private void Compute_Credits()
+        private void Compute_Credits(GameClock gameClock)
         {
             credits_per_tick_gross = base_econ;
 
@@ -291,7 +292,7 @@ namespace EntropyServer
             }
         }
 
-        private void Compute_Research()
+        private void Compute_Research(GameClock gameClock)
         {
             research_per_tick = base_research;
 
@@ -308,7 +309,7 @@ namespace EntropyServer
             }
         }
 
-        private void Compute_Ship_Pop()
+        private void Compute_Ship_Pop(GameClock gameClock)
         {
             ship_pop_cap = TechManager.Tech_Mod(TECH_TYPE.TECH_BASE_FLEET_CAP, tech_base_fleet_cap);
 
@@ -325,7 +326,7 @@ namespace EntropyServer
             }
         }
 
-        private void Compute_Build_Slots()
+        private void Compute_Build_Slots(GameClock gameClock)
         {
             build_slots_cap = base_build_slots;
             asteroids_cap = TechManager.Tech_Mod(TECH_TYPE.TECH_BASE_ASTEROID_CAP, tech_base_asteroid_cap);
@@ -355,7 +356,7 @@ namespace EntropyServer
             
         }
 
-        public void Compute_Scores()
+        public void Compute_Scores(GameClock gameClock)
         {
             Score_Overall = 0;
             Score_Combat = 0;
@@ -497,29 +498,29 @@ namespace EntropyServer
 
         #region Tick Processing
 
-        public void Do_Tick()
+        public void Do_Tick(GameClock gameClock)
         {
-            Process_Actions();
-            Compute_Credits();
-            Compute_Research();
-            Compute_Ship_Pop();
+            Process_Actions(gameClock);
+            Compute_Credits(gameClock);
+            Compute_Research(gameClock);
+            Compute_Ship_Pop(gameClock);
             
             credits_current += credits_per_tick_net;
 
-            Compute_Scores();
+            Compute_Scores(gameClock);
         }
 
         //TODO Notifications for completed actions
-        private void Process_Actions()
+        private void Process_Actions(GameClock gameClock)
         {
             //Attack Slot
-            if (TimeManager.Tick == action_attack.End_Tick)
+            if (gameClock.CurrentTick == action_attack.End_Tick)
             {
                 Do_Combat(action_attack);
             }
 
             //Ship Slot
-            if (TimeManager.Tick == action_build_ship.End_Tick)
+            if (gameClock.CurrentTick == action_build_ship.End_Tick)
             {
                 SHIP_TYPE ship_type = (SHIP_TYPE)action_build_ship.Param;
 
@@ -527,7 +528,7 @@ namespace EntropyServer
             }
 
             //Structure Slot
-            if (TimeManager.Tick == action_build_struct.End_Tick)
+            if (gameClock.CurrentTick == action_build_struct.End_Tick)
             {
                 if (this.action_build_struct.Type == PLAYER_ACTION.ACTION_BUILD_STRUCTURE)
                 {
@@ -548,7 +549,7 @@ namespace EntropyServer
             }
 
             //Research Slot
-            if (TimeManager.Tick == action_research.End_Tick)
+            if (gameClock.CurrentTick == action_research.End_Tick)
             {
                 TECH_TYPE tech_type = (TECH_TYPE)action_research.Param;
                 //TODO Cap at max tier
@@ -609,7 +610,7 @@ namespace EntropyServer
             }
 
             //Diplomacy Slot
-            if (TimeManager.Tick == action_diplomacy.End_Tick)
+            if (gameClock.CurrentTick == action_diplomacy.End_Tick)
             {
                 //Diplomacy on self = "Optimize Planetary Trade"
                 if (action_diplomacy.Target_Player_Name == user_name)
@@ -623,7 +624,7 @@ namespace EntropyServer
             }
 
             //Direct Slot
-            if (TimeManager.Tick == action_direct.End_Tick)
+            if (gameClock.CurrentTick == action_direct.End_Tick)
             {
                 credits_current += Score_Overall / DIRECT_DIVISOR;
             }
